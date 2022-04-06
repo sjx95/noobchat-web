@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import AgoraRTC from 'agora-rtc-sdk-ng';
+import React, { useEffect, useState } from 'react';
+import AgoraRTC, { ILocalTrack } from 'agora-rtc-sdk-ng';
 import useAgora from './hooks/useAgora';
 import MediaPlayer from './components/MediaPlayer';
 import './Call.css';
@@ -17,6 +17,26 @@ function GenToken(channelName: string): string {
   return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
 }
 
+function useTrackControl(joinState: boolean, track: ILocalTrack | undefined) {
+  const [checked, setChecked] = useState(true);
+  const [disabled, setDisabled] = useState(true);
+
+  useEffect(() => {
+    if (!joinState || !track) { setChecked(true); setDisabled(true) };
+    if (joinState && track) { setDisabled(false) };
+  }, [joinState, track]);
+
+  const onChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    setChecked(event.target.checked);
+
+    if (track) {
+      setDisabled(true);
+      track?.setEnabled(event.target.checked).then(() => setDisabled(false));
+    }
+  }
+
+  return { checked, disabled, onChange }
+}
 
 function Call() {
   const [channel, setChannel] = useState('test-web-room');
@@ -32,6 +52,10 @@ function Call() {
           Channel:
           <input defaultValue={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
         </label>
+        <label>Audio:</label>
+        <input type='checkbox' {...useTrackControl(joinState, localAudioTrack)} />
+        <label>Video:</label>
+        <input type='checkbox' {...useTrackControl(joinState, localVideoTrack)} />
         <div className='button-group'>
           <button id='join' type='button' className='btn btn-primary btn-sm' disabled={joinState} onClick={() => { join(appID, channel, GenToken(channel)) }}>Join</button>
           <button id='leave' type='button' className='btn btn-primary btn-sm' disabled={!joinState} onClick={() => { leave() }}>Leave</button>
