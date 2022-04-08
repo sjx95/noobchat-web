@@ -30,19 +30,26 @@ const MediaPlayer = (props: VideoPlayerProps) => {
     };
   }, [props.audioTrack, props.disableAudio]);
 
-  const [volume, setVolume] = useState(0);
+  const [level, setLevel] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setVolume(props.audioTrack?.getVolumeLevel() ?? 0), 50);
+    const id = setInterval(() => setLevel(props.audioTrack?.getVolumeLevel() ?? 0), 50);
     return () => clearInterval(id);
   }, [props.audioTrack]);
 
-  props.audioTrack?.getMediaStreamTrack()
+  const [volume, setVolume] = useState(100);
+  useEffect(() => props.audioTrack?.setVolume(volume), [volume, props.audioTrack]);
 
   return (
     <div>
       <div ref={container} className="video-player" style={{ width: "320px", height: "240px" }} />
       <div>
-        Track volume: <progress value={volume} max={1}> {volume} </progress>
+        Track Level: <progress value={level} max={1}> {level} </progress>
+      </div>
+      <div>
+        Track Volume:
+        <input type='range' min={0} max={200} step={10} value={volume}
+          onChange={(event) => setVolume(event.target.valueAsNumber)} />
+        {volume} %
       </div>
     </div>
   );
