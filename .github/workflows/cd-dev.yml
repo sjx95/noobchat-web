@@ -25,12 +25,12 @@ jobs:
         yarn install
         yarn run build
     
-    - name: Sync files
-      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+    - name: Install SSH Key
+      uses: shimataro/ssh-key-action@v2
       with:
-        server: ${{ secrets.FTP_HOST }}
-        username: ${{ secrets.FTP_USER }}
-        password: ${{ secrets.FTP_PASSWD }}
-        protocol: ftps
-        local-dir: ./build/
-        server-dir: ./
+        key: ${{ secrets.SSH_PRIVATE_KEY }} 
+        known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+    - name: Sync files
+      run: |
+        rsync -avz ./build/ ${{ secrets.SSH_RSYNC_TARGET }}
