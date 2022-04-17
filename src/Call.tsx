@@ -4,17 +4,24 @@ import useAgora from './hooks/useAgora';
 import MediaPlayer from './components/MediaPlayer';
 import './Call.css';
 import 'agora-access-token';
-import { RtcRole, RtcTokenBuilder } from 'agora-access-token';
+import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from 'agora-access-token';
+import useAgoraRTM from './hooks/useAgoraRTM';
 
 const client = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
 const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
 const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
+const userID = Math.floor(Math.random() * (1 << 31 - 1));
 
-function GenToken(channelName: string): string {
+function genRTCToken(channelName: string): string {
   const uid = 0;
   const role = RtcRole.PUBLISHER;
   const privilegeExpiredTs = 0
   return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
+}
+
+function genRTMToken(): string {
+  const token = RtmTokenBuilder.buildToken(appID, appCertificate, userID.toString(), RtmRole.Rtm_User, 86400);
+  return token;
 }
 
 function useTrackControl(joinState: boolean, track: ILocalTrack | undefined) {
@@ -40,10 +47,9 @@ function useTrackControl(joinState: boolean, track: ILocalTrack | undefined) {
 
 function Call() {
   const [channel, setChannel] = useState('test-web-room');
-  const {
-    // eslint-disable-next-line
-    localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers
-  } = useAgora(client);
+  const [message, setMessage] = useState('');
+  const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
+  const rtm = useAgoraRTM();
 
   return (
     <div className='call'>
@@ -52,16 +58,30 @@ function Call() {
           Channel:
           <input defaultValue={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
         </label>
-        <label>Audio:</label>
-        <input type='checkbox' {...useTrackControl(joinState, localAudioTrack)} />
-        <label>Video:</label>
-        <input type='checkbox' {...useTrackControl(joinState, localVideoTrack)} />
+        <label>
+          Audio:
+          <input type='checkbox' {...useTrackControl(joinState, localAudioTrack)} />
+        </label>
+        <label>
+          Video:
+          <input type='checkbox' {...useTrackControl(joinState, localVideoTrack)} />
+        </label>
         <div className='button-group'>
-          <button id='join' type='button' className='btn btn-primary btn-sm' disabled={joinState} onClick={() => { join(appID, channel, GenToken(channel)) }}>Join</button>
-          <button id='leave' type='button' className='btn btn-primary btn-sm' disabled={!joinState} onClick={() => { leave() }}>Leave</button>
+          <label>RTC Online: <input type='checkbox' disabled={true} checked={joinState} /></label>
+          <label>RTM Online: <input type='checkbox' disabled={true} checked={rtm.joinState} /></label>
+          <button id='join' type='button' className='btn btn-primary btn-sm' disabled={joinState || rtm.joinState}
+            onClick={async () => {
+              await join(appID, channel, genRTCToken(channel), userID);
+              await rtm.join(appID, channel, userID.toString(), genRTMToken());
+            }}>Join</button>
+          <button id='leave' type='button' className='btn btn-primary btn-sm' disabled={!joinState && !rtm.joinState}
+            onClick={async () => {
+              await rtm.leave();
+              await leave();
+            }}>Leave</button>
         </div>
       </form>
-      <div className='player-container'>
+      <div className='rtc-container'>
         <div className='local-player-wrapper'>
           <p className='local-player-text'>{localVideoTrack && `localTrack`}{joinState && localVideoTrack ? `(${client.uid})` : ''}</p>
           <MediaPlayer videoTrack={localVideoTrack} audioTrack={localAudioTrack} disableAudio={true} />
@@ -72,6 +92,15 @@ function Call() {
             <MediaPlayer videoTrack={user.videoTrack} audioTrack={user.audioTrack} />
           </div>
         ))}
+      </div>
+      <div className='rtm-container'>
+        {rtm.history.map(str => <div>{str}</div>)}
+        <div>
+          {userID}:
+          <input type='text' value={message} onChange={(event) => setMessage(event.target.value)} />
+          <button disabled={!rtm.joinState}
+            onClick={() => { rtm.sendMessage(message); setMessage(''); }}> Send </button>
+        </div>
       </div>
     </div>
   );

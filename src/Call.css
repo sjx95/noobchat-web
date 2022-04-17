@@ -2,16 +2,22 @@
   text-align: center;
 }
 
-.player-container {
+.rtc-container {
+  float: left;
   padding: 20px;
   text-align: initial;
+  width: 50vw;
+}
+
+.rtm-container {
+  padding: 20px;
+  text-align: initial;
+  margin-left: 50vw;
 }
 
 .button-group {
   padding: 20px;
 }
-
-
 
 .call-form {
   padding: 20px;
