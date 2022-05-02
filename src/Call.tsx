@@ -56,7 +56,7 @@ function Call() {
       <form className='call-form'>
         <label>
           Channel:
-          <input defaultValue={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
+          <input value={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
         </label>
         <label>
           Audio:

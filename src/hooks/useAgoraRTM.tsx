@@ -65,5 +65,7 @@ export default function useAgoraRTM(): {
 
 function useHistory(n: number): [string[], (msg: string) => void, () => void] {
     const [history, setHistory] = useState<string[]>([]);
-    return [history, (msg) => setHistory([...history, msg].slice(-n)), () => setHistory([])];
+    const record = (msg: string) => setHistory([...history, msg].slice(-n));
+    const clean = () => { if (history.length > 0) setHistory([]); };
+    return [history, record, clean];
 }
