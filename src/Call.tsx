@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import AgoraRTC, { ILocalTrack } from 'agora-rtc-sdk-ng';
+import AgoraRTC, { IAgoraRTCRemoteUser, ILocalAudioTrack, ILocalTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng';
 import useAgora from './hooks/useAgora';
 import MediaPlayer from './components/MediaPlayer';
 import './Call.css';
@@ -46,21 +46,33 @@ function useTrackControl(joinState: boolean, track: ILocalTrack | undefined) {
   return { checked, disabled, onChange }
 }
 
+interface ICallStates {
+  channel: { value: string, onChange: ((value: string) => void) }
+}
+
 export default function Call() {
+
+  const [channel, setChannel] = useState('test-web-room');
+  const [message, setMessage] = useState('');
+  const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
+  const rtm = useAgoraRTM();
+
+  const state: ICallStates = {
+    channel: { value: channel, onChange: setChannel }
+  }
 
 
   return (
     <Container fluid={true}>
-
       <Row>
         <Col lg={3}>
           <LocalDeviceControl />
         </Col>
         <Col lg={6}>
-          <Videos />
+          <Videos userID={userID} />
         </Col>
         <Col lg={3}>
-          Chat
+          <Chats sendMessage={()=>{}}/>
         </Col>
       </Row>
 
@@ -116,11 +128,62 @@ function LocalDeviceControl() {
   )
 }
 
-function Videos() {
+export interface VideosProps {
+  userID?: number
+  localAudioTrack?: ILocalAudioTrack
+  localVideoTrack?: ILocalVideoTrack
+  remoteUsers?: IAgoraRTCRemoteUser[]
+}
+
+function Videos(props: VideosProps) {
+  return (
+    <div>
+      <div className='local-player-wrapper'>
+        <p className='local-player-text'> localTrack({props.userID}) </p>
+        <MediaPlayer videoTrack={props.localVideoTrack} audioTrack={props.localAudioTrack} disableAudio={true} />
+      </div>
+      {props.remoteUsers?.map(user => (
+        <div className='remote-player-wrapper' key={user.uid}>
+          <p className='remote-player-text'>{`remoteVideo(${user.uid})`}</p>
+          <MediaPlayer videoTrack={user.videoTrack} audioTrack={user.audioTrack} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export interface ChatsProps {
+  userID?: number
+  localAudioTrack?: ILocalAudioTrack
+  localVideoTrack?: ILocalVideoTrack
+  remoteUsers?: IAgoraRTCRemoteUser[]
+  history?: string[],
+  sendMessage: Function
+}
+
+function Chats(props: ChatsProps) {
+  const [message, setMessage] = useState('');
+  return (
+    <div>
+      {props.history?.map(str => <div>{str}</div>)}
+      <div>
+        {userID}:
+        <input type='text' value={message} onChange={(event) => setMessage(event.target.value)} />
+        <button onClick={() => { props.sendMessage(message); setMessage(''); }}>
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}
+
+
+function VideosB(props: any) {
   const [channel, setChannel] = useState('test-web-room');
   const [message, setMessage] = useState('');
   const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
   const rtm = useAgoraRTM();
+  console.log(props.channel);
   return (
     <div className='call'>
       <form className='call-form'>
