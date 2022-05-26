@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import AgoraRTC, { IAgoraRTCRemoteUser, ILocalAudioTrack, ILocalTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng';
 import useAgora from './hooks/useAgora';
 import MediaPlayer from './components/MediaPlayer';
@@ -6,7 +6,8 @@ import './Call.css';
 import 'agora-access-token';
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from 'agora-access-token';
 import useAgoraRTM from './hooks/useAgoraRTM';
-import { Button, Col, Container, Dropdown, Form, Row } from 'react-bootstrap';
+import { Button, Col, Container, Dropdown, FloatingLabel, Form, Row } from 'react-bootstrap';
+import ThemeProvider, { useBootstrapBreakpoints } from 'react-bootstrap/esm/ThemeProvider';
 
 const client = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
 const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
@@ -54,25 +55,27 @@ export default function Call() {
 
   const [channel, setChannel] = useState('test-web-room');
   const [message, setMessage] = useState('');
-  const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
+  const [localAudioTrack, setLocalAudioTrack] = useState<ILocalAudioTrack | undefined>();
+  const [localVideoTrack, setLocalVideoTrack] = useState<ILocalVideoTrack>();
+  const [rtcRemoteUsers, setRTCRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
+  const { leave, join, joinState, remoteUsers } = useAgora(client);
   const rtm = useAgoraRTM();
 
   const state: ICallStates = {
     channel: { value: channel, onChange: setChannel }
-  }
-
+  };
 
   return (
     <Container fluid={true}>
       <Row>
         <Col lg={3}>
-          <LocalDeviceControl />
+          <ChatController setLocalAudioTrack={setLocalAudioTrack} setLocalVideoTrack={setLocalVideoTrack} setRTCRemoteUsers={setRTCRemoteUsers} />
         </Col>
         <Col lg={6}>
           <Videos userID={userID} />
         </Col>
         <Col lg={3}>
-          <Chats sendMessage={()=>{}}/>
+          <Chats sendMessage={() => { }} />
         </Col>
       </Row>
 
@@ -80,7 +83,13 @@ export default function Call() {
   );
 }
 
-function LocalDeviceControl() {
+interface ChatControllerProps {
+  setLocalAudioTrack: (track: ILocalAudioTrack) => void,
+  setLocalVideoTrack: (track: ILocalVideoTrack) => void,
+  setRTCRemoteUsers: Dispatch<SetStateAction<IAgoraRTCRemoteUser[]>>,
+};
+
+function ChatController(props: ChatControllerProps) {
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
 
@@ -92,39 +101,88 @@ function LocalDeviceControl() {
     setDevices(ds);
   }
 
+  const [channel, setChannel] = useState('test-web-room');
+  const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
+  const rtm = useAgoraRTM();
+
   return (
-    <Container>
+    <Form>
+      <Row>
+        <Col> Room Control</Col>
+      </Row>
+      <Row>
+        <Col>
+          <FloatingLabel label='Channel' controlId='channel' className='mb-3'>
+            <Form.Control />
+          </FloatingLabel>
+        </Col>
+      </Row>
       <Row>
         <Col> Local Device Control</Col>
       </Row>
-      <Row>
+      <Row xs={4} lg={1}>
         <Col>
-          <Button> Refresh </Button>
+          <div className="d-grid">
+            <Button as='div' variant="primary" size="lg">
+              Refresh Devices
+            </Button>
+          </div>
         </Col>
-        <Row>
-          <Col>
-            Video:
-            <Form.Select>
-              {devices.filter((d) => { return d.kind === 'videoinput' }).
-                map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
-            </Form.Select>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            Audio:
-            <Form.Select>
-              {devices.filter((d) => { return d.kind === 'audioinput' }).
-                map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
-            </Form.Select>
-          </Col>
-        </Row>
-        <Col>
-          { }
-        </Col>
-
+        <FloatingLabel as={Col} label='Audio Input'>
+          <Form.Select>
+            <option value=""> Disable </option>
+            {devices.filter((d) => { return d.kind === 'videoinput' }).
+              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+          </Form.Select>
+        </FloatingLabel>
+        <FloatingLabel as={Col} label='Audio Input'>
+          <Form.Select value={"default"}>
+            <option value=""> Mute </option>
+            {devices.filter((d) => { return d.kind === 'audioinput' }).
+              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+          </Form.Select>
+        </FloatingLabel>
+        <FloatingLabel as={Col} label='Audio Output'>
+          <Form.Select value={"default"}>
+            <option value=""> Mute </option>
+            {devices.filter((d) => { return d.kind === 'audiooutput' }).
+              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+          </Form.Select>
+        </FloatingLabel>
       </Row>
-    </Container>
+      <Col>
+        <form className='call-form'>
+          <label>
+            Channel:
+            <input value={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
+          </label>
+          <label>
+            Audio:
+            <input type='checkbox' {...useTrackControl(joinState, localAudioTrack)} />
+          </label>
+          <label>
+            Video:
+            <input type='checkbox' {...useTrackControl(joinState, localVideoTrack)} />
+          </label>
+          <div className='button-group'>
+            <label>RTC Online: <input type='checkbox' disabled={true} checked={joinState} /></label>
+            <label>RTM Online: <input type='checkbox' disabled={true} checked={rtm.joinState} /></label>
+            <button id='join' type='button' className='btn btn-primary btn-sm' disabled={joinState || rtm.joinState}
+              onClick={async () => {
+                await join(appID, channel, genRTCToken(channel), userID);
+                await rtm.join(appID, channel, userID.toString(), genRTMToken());
+              }}>Join</button>
+            <button id='leave' type='button' className='btn btn-primary btn-sm' disabled={!joinState && !rtm.joinState}
+              onClick={async () => {
+                await rtm.leave();
+                await leave();
+              }}>Leave</button>
+          </div>
+        </form>
+      </Col>
+
+
+    </Form>
   )
 }
 
