@@ -61,10 +61,6 @@ export default function Call() {
   const { leave, join, joinState, remoteUsers } = useAgora(client);
   const rtm = useAgoraRTM();
 
-  const state: ICallStates = {
-    channel: { value: channel, onChange: setChannel }
-  };
-
   return (
     <Container fluid={true}>
       <Row>
@@ -72,10 +68,10 @@ export default function Call() {
           <ChatController setLocalAudioTrack={setLocalAudioTrack} setLocalVideoTrack={setLocalVideoTrack} setRTCRemoteUsers={setRTCRemoteUsers} />
         </Col>
         <Col lg={6}>
-          <Videos userID={userID} />
+          <ChatVideos userID={userID} />
         </Col>
         <Col lg={3}>
-          <Chats sendMessage={() => { }} />
+          <ChatTexts sendMessage={() => { }} />
         </Col>
       </Row>
 
@@ -92,7 +88,6 @@ interface ChatControllerProps {
 function ChatController(props: ChatControllerProps) {
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-
   useEffect(() => { updateDevices(); }, [])
 
   async function updateDevices() {
@@ -101,99 +96,84 @@ function ChatController(props: ChatControllerProps) {
     setDevices(ds);
   }
 
-  const [channel, setChannel] = useState('test-web-room');
-  const { localAudioTrack, localVideoTrack, leave, join, joinState, remoteUsers } = useAgora(client);
-  const rtm = useAgoraRTM();
-
   return (
     <Form>
       <Row>
         <Col> Room Control</Col>
       </Row>
       <Row>
-        <Col>
-          <FloatingLabel label='Channel' controlId='channel' className='mb-3'>
-            <Form.Control />
+        <Col xs={6} md={8} lg={12}>
+          <FloatingLabel label='Channel' controlId='channel'>
+            <Form.Control placeholder="test-web-room" />
           </FloatingLabel>
+        </Col>
+        <Col xs={6} md={4} lg={12}>
+          <Row xs={2} style={{ height: '100%' }}>
+            <Col>
+              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}>
+                Join
+              </Button>
+            </Col>
+            <Col>
+              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}>
+                Leave
+              </Button>
+            </Col>
+          </Row>
         </Col>
       </Row>
       <Row>
         <Col> Local Device Control</Col>
       </Row>
-      <Row xs={4} lg={1}>
+      <Row xs={2} md={4} lg={1} style={{ alignItems: 'stretch' }}>
         <Col>
-          <div className="d-grid">
-            <Button as='div' variant="primary" size="lg">
-              Refresh Devices
-            </Button>
-          </div>
+          <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}>
+            Refresh Devices
+          </Button>
         </Col>
-        <FloatingLabel as={Col} label='Audio Input'>
+        <FloatingLabel as={Col} label='Video Input'>
           <Form.Select>
             <option value=""> Disable </option>
             {devices.filter((d) => { return d.kind === 'videoinput' }).
-              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
         <FloatingLabel as={Col} label='Audio Input'>
           <Form.Select value={"default"}>
             <option value=""> Mute </option>
             {devices.filter((d) => { return d.kind === 'audioinput' }).
-              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
         <FloatingLabel as={Col} label='Audio Output'>
           <Form.Select value={"default"}>
             <option value=""> Mute </option>
             {devices.filter((d) => { return d.kind === 'audiooutput' }).
-              map((d) => { return (<option value={d.deviceId}> {d.label} </option>) })}
+              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
       </Row>
-      <Col>
-        <form className='call-form'>
-          <label>
-            Channel:
-            <input value={channel} type='text' name='channel' onChange={(event) => { setChannel(event.target.value) }} />
-          </label>
-          <label>
-            Audio:
-            <input type='checkbox' {...useTrackControl(joinState, localAudioTrack)} />
-          </label>
-          <label>
-            Video:
-            <input type='checkbox' {...useTrackControl(joinState, localVideoTrack)} />
-          </label>
-          <div className='button-group'>
-            <label>RTC Online: <input type='checkbox' disabled={true} checked={joinState} /></label>
-            <label>RTM Online: <input type='checkbox' disabled={true} checked={rtm.joinState} /></label>
-            <button id='join' type='button' className='btn btn-primary btn-sm' disabled={joinState || rtm.joinState}
-              onClick={async () => {
-                await join(appID, channel, genRTCToken(channel), userID);
-                await rtm.join(appID, channel, userID.toString(), genRTMToken());
-              }}>Join</button>
-            <button id='leave' type='button' className='btn btn-primary btn-sm' disabled={!joinState && !rtm.joinState}
-              onClick={async () => {
-                await rtm.leave();
-                await leave();
-              }}>Leave</button>
-          </div>
-        </form>
-      </Col>
-
-
+      <Row>
+        <Col> Advance Control</Col>
+      </Row>
+      <Row>
+        <Col>
+          <Form.Check type='switch' label={`Auto Subscribe Video`} />
+          <Form.Check type='switch' label={`Auto Subscribe Audio`} />
+        </Col>
+      </Row>
     </Form>
   )
 }
 
-export interface VideosProps {
+export interface ChatVideosProps {
   userID?: number
   localAudioTrack?: ILocalAudioTrack
   localVideoTrack?: ILocalVideoTrack
   remoteUsers?: IAgoraRTCRemoteUser[]
 }
 
-function Videos(props: VideosProps) {
+function ChatVideos(props: ChatVideosProps) {
   return (
     <div>
       <div className='local-player-wrapper'>
@@ -210,16 +190,13 @@ function Videos(props: VideosProps) {
   )
 }
 
-export interface ChatsProps {
+export interface ChatTextsProps {
   userID?: number
-  localAudioTrack?: ILocalAudioTrack
-  localVideoTrack?: ILocalVideoTrack
-  remoteUsers?: IAgoraRTCRemoteUser[]
   history?: string[],
   sendMessage: Function
 }
 
-function Chats(props: ChatsProps) {
+function ChatTexts(props: ChatTextsProps) {
   const [message, setMessage] = useState('');
   return (
     <div>
