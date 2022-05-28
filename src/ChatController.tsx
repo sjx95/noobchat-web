@@ -1,5 +1,5 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access-token"
-import AgoraRTC, { IAgoraRTCClient } from "agora-rtc-sdk-ng"
+import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect } from "react"
 import { Form, Row, Col, FloatingLabel, Button } from "react-bootstrap"
@@ -42,8 +42,27 @@ export function ChatController(props: ChatControllerProps) {
     setDevices(ds);
   }
 
-  const [joining, setJoining] = useState(false);
+  const [videoInput, setVideoInput] = useState('');
+  const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack>();
+  useEffect(() => {
+    if (!props.videoClient.value || videoInput === '') {
+      props.videoClient.value?.unpublish(localVideoTrack);
+      localVideoTrack?.close();
+      setLocalVideoTrack(undefined);
+      return;
+    }
 
+    if (videoInput !== '') {
+      if (!localVideoTrack) {
+        AgoraRTC.createCameraVideoTrack({ cameraId: videoInput }).then((track) => {
+          setLocalVideoTrack(track);
+          props.videoClient.value?.publish(track);
+        });
+      } else {
+        localVideoTrack.setDevice(videoInput);
+      }
+    }
+  }, [props.videoClient.value, videoInput, localVideoTrack, setLocalVideoTrack]);
 
   async function join() {
     // if (!props.videoClient.value || !props.msgClient.value) return;
@@ -119,7 +138,7 @@ export function ChatController(props: ChatControllerProps) {
           </Button>
         </Col>
         <FloatingLabel as={Col} label='Video Input'>
-          <Form.Select>
+          <Form.Select value={videoInput} onChange={(e) => setVideoInput(e.target.value)}>
             <option value=""> Disable </option>
             {devices.filter((d) => { return d.kind === 'videoinput' }).
               map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
