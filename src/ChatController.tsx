@@ -1,5 +1,5 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access-token"
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, ILocalVideoTrack } from "agora-rtc-sdk-ng"
+import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, ILocalVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect } from "react"
 import { Form, Row, Col, FloatingLabel, Button } from "react-bootstrap"
@@ -8,7 +8,7 @@ import { IWrappedState } from "./hooks/useWrappedStates"
 const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
 const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
 
-const client = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
+const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
 const msgClient = AgoraRTM.createInstance(appID);
 
 const userID = Math.floor(Math.random() * (1 << 31 - 1));
@@ -46,7 +46,7 @@ export function ChatController(props: ChatControllerProps) {
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack>();
   useEffect(() => {
     if (!props.videoClient.value || videoInput === '') {
-      props.videoClient.value?.unpublish(localVideoTrack);
+      !localVideoTrack || props.videoClient.value?.unpublish(localVideoTrack);
       localVideoTrack?.close();
       setLocalVideoTrack(undefined);
       return;
@@ -64,13 +64,37 @@ export function ChatController(props: ChatControllerProps) {
     }
   }, [props.videoClient.value, videoInput, localVideoTrack, setLocalVideoTrack]);
 
+  const [audioInput, setAudioInput] = useState('default');
+  const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack>();
+  useEffect(() => {
+    if (!props.videoClient.value || audioInput === '') {
+      !localAudioTrack || props.videoClient.value?.unpublish(localAudioTrack);
+      localAudioTrack?.close();
+      setLocalAudioTrack(undefined);
+      return;
+    }
+
+    if (audioInput !== '') {
+      if (!localAudioTrack) {
+        const miccfg: MicrophoneAudioTrackInitConfig = { microphoneId: audioInput, AEC: true, AGC: true, ANS: true };
+        AgoraRTC.createMicrophoneAudioTrack(miccfg).then((track) => {
+          setLocalAudioTrack(track);
+          props.videoClient.value?.publish(track);
+        });
+      } else {
+        localAudioTrack.setDevice(audioInput);
+      }
+    }
+  }, [props.videoClient.value, audioInput, localAudioTrack, setLocalAudioTrack]);
+
+
   async function join() {
     // if (!props.videoClient.value || !props.msgClient.value) return;
 
     const channelName = props.channel.value;
 
-    await client.join(appID, channelName, genRTCToken(channelName), userID);
-    props.videoClient.set(client);
+    await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
+    props.videoClient.set(videoClient);
 
     await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
     props.msgClient.set(msgClient);
@@ -145,7 +169,7 @@ export function ChatController(props: ChatControllerProps) {
           </Form.Select>
         </FloatingLabel>
         <FloatingLabel as={Col} label='Audio Input'>
-          <Form.Select value={"default"}>
+          <Form.Select value={audioInput} onChange={(e) => setAudioInput(e.target.value)}>
             <option value=""> Mute </option>
             {devices.filter((d) => { return d.kind === 'audioinput' }).
               map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
@@ -159,10 +183,10 @@ export function ChatController(props: ChatControllerProps) {
           </Form.Select>
         </FloatingLabel>
       </Row>
-      <Row>
+      <Row hidden>
         <Col> Advance Control</Col>
       </Row>
-      <Row>
+      <Row hidden>
         <Col>
           <Form.Switch label={`Mute Local Audio`} />
           <Form.Switch label={`Mute Remote Audio`} />
