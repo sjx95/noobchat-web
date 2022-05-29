@@ -1,17 +1,16 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access-token"
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, ILocalVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
+import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect } from "react"
 import { Form, Row, Col, FloatingLabel, Button } from "react-bootstrap"
 import { IWrappedState } from "./hooks/useWrappedStates"
 
-const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
+export const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
 const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
+export const userID = Math.floor(Math.random() * (1 << 31 - 1));
 
 const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
 const msgClient = AgoraRTM.createInstance(appID);
-
-const userID = Math.floor(Math.random() * (1 << 31 - 1));
 
 function genRTCToken(channelName: string): string {
   const uid = 0;
@@ -31,6 +30,10 @@ interface ChatControllerProps {
   videoClient: IWrappedState<IAgoraRTCClient | undefined>
   msgClient: IWrappedState<RtmClient | undefined>
   msgChannel: IWrappedState<RtmChannel | undefined>
+
+  rtcRemoteUsers: IWrappedState<IAgoraRTCRemoteUser[]>
+  localAudioTrack: IWrappedState<IMicrophoneAudioTrack | undefined>
+  localVideoTrack: IWrappedState<ICameraVideoTrack | undefined>
 };
 
 export function ChatController(props: ChatControllerProps) {
@@ -43,7 +46,7 @@ export function ChatController(props: ChatControllerProps) {
   }
 
   const [videoInput, setVideoInput] = useState('');
-  const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack>();
+  const { value: localVideoTrack, set: setLocalVideoTrack } = props.localVideoTrack;
   useEffect(() => {
     if (!props.videoClient.value || videoInput === '') {
       !localVideoTrack || props.videoClient.value?.unpublish(localVideoTrack);
@@ -65,7 +68,7 @@ export function ChatController(props: ChatControllerProps) {
   }, [props.videoClient.value, videoInput, localVideoTrack, setLocalVideoTrack]);
 
   const [audioInput, setAudioInput] = useState('default');
-  const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack>();
+  const { value: localAudioTrack, set: setLocalAudioTrack } = props.localAudioTrack;
   useEffect(() => {
     if (!props.videoClient.value || audioInput === '') {
       !localAudioTrack || props.videoClient.value?.unpublish(localAudioTrack);
@@ -86,6 +89,39 @@ export function ChatController(props: ChatControllerProps) {
       }
     }
   }, [props.videoClient.value, audioInput, localAudioTrack, setLocalAudioTrack]);
+
+  useEffect(() => {
+    const client = props.videoClient.value;
+    const setRemoteUsers = props.rtcRemoteUsers.set;
+    if (!client) return;
+    setRemoteUsers(client.remoteUsers);
+
+    const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
+      await client.subscribe(user, mediaType);
+      // toggle rerender while state of remoteUsers changed.
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    client.on('user-published', handleUserPublished);
+    client.on('user-unpublished', handleUserUnpublished);
+    client.on('user-joined', handleUserJoined);
+    client.on('user-left', handleUserLeft);
+
+    return () => {
+      client.off('user-published', handleUserPublished);
+      client.off('user-unpublished', handleUserUnpublished);
+      client.off('user-joined', handleUserJoined);
+      client.off('user-left', handleUserLeft);
+    };
+  }, [props.videoClient.value, props.videoClient.set, props.rtcRemoteUsers.set]);
 
 
   async function join() {
@@ -164,22 +200,22 @@ export function ChatController(props: ChatControllerProps) {
         <FloatingLabel as={Col} label='Video Input'>
           <Form.Select value={videoInput} onChange={(e) => setVideoInput(e.target.value)}>
             <option value=""> Disable </option>
-            {devices.filter((d) => { return d.kind === 'videoinput' }).
-              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
+            {devices.filter((d) => { return d.kind === 'videoinput' })
+              .map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
         <FloatingLabel as={Col} label='Audio Input'>
           <Form.Select value={audioInput} onChange={(e) => setAudioInput(e.target.value)}>
             <option value=""> Mute </option>
-            {devices.filter((d) => { return d.kind === 'audioinput' }).
-              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
+            {devices.filter((d) => { return d.kind === 'audioinput' })
+              .map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
-        <FloatingLabel as={Col} label='Audio Output'>
+        <FloatingLabel as={Col} label='Audio Output' hidden>
           <Form.Select value={"default"}>
             <option value=""> Mute </option>
-            {devices.filter((d) => { return d.kind === 'audiooutput' }).
-              map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
+            {devices.filter((d) => { return d.kind === 'audiooutput' })
+              .map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
       </Row>

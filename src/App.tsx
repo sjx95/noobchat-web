@@ -1,4 +1,4 @@
-import { Navbar, Container, Nav, NavDropdown } from "react-bootstrap";
+import { Navbar, Container } from "react-bootstrap";
 import Call from "./Call";
 
 export default function App() {
