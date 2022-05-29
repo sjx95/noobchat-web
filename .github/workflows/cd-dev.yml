@@ -1,7 +1,7 @@
-name: CD - Latest Development
+name: CD - Latest Main Branch
 on:
   push:
-    branches: [ dev ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
