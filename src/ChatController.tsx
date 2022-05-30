@@ -2,11 +2,9 @@ import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect } from "react"
-import { Form, Row, Col, FloatingLabel, Button } from "react-bootstrap"
+import { Form, Row, Col, FloatingLabel, Button, Modal } from "react-bootstrap"
 import { IWrappedState } from "./hooks/useWrappedStates"
 
-export const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
-const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
 export const userID = Math.floor(Math.random() * (1 << 31 - 1));
 
 interface ChatControllerProps {
@@ -81,50 +79,61 @@ export function ChatController(props: ChatControllerProps) {
 
 function RoomController(props: ChatControllerProps) {
 
+  const [hiddenAppCertInput] = useState((process.env.REACT_APP_AGORA_APP_ID && process.env.REACT_APP_AGORA_APP_CERTIFICATE && true) || false);
+  const [appID, setAppID] = useState(process.env.REACT_APP_AGORA_APP_ID ?? "");
+  const [appCert, setAppCert] = useState(process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? "");
+  const [errMsg, setErrMsg] = useState<string>();
+
   async function join() {
     // if (!props.videoClient.value || !props.msgClient.value) return;
-
-    const channelName = props.channel.value;
-
-    const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
-    const msgClient = AgoraRTM.createInstance(appID);
 
     function genRTCToken(channelName: string): string {
       const uid = 0;
       const role = RtcRole.PUBLISHER;
       const privilegeExpiredTs = 0
-      return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
+      return RtcTokenBuilder.buildTokenWithUid(appID, appCert, channelName, uid, role, privilegeExpiredTs)
     }
 
     function genRTMToken(): string {
-      const token = RtmTokenBuilder.buildToken(appID, appCertificate, userID.toString(), RtmRole.Rtm_User, 86400);
+      const token = RtmTokenBuilder.buildToken(appID, appCert, userID.toString(), RtmRole.Rtm_User, 86400);
       return token;
     }
 
-    await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
-    props.videoClient.set(videoClient);
+    try {
+      const channelName = props.channel.value;
+      const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
+      const msgClient = AgoraRTM.createInstance(appID);
 
-    await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
-    props.msgClient.set(msgClient);
+      await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
+      await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
+      const channel = msgClient.createChannel(channelName);
+      await channel.join();
 
-    const channel = msgClient.createChannel(channelName);
-    await channel.join();
+      props.videoClient.set(videoClient);
+      props.msgClient.set(msgClient);
+      props.msgChannel.set(channel);
 
-    props.msgChannel.set(channel);
-    props.joined.set(true);
+      props.joined.set(true);
+    } catch (e) {
+      setErrMsg(String(e));
+    }
+
   }
 
   async function leave() {
-    await props.msgChannel.value?.leave();
-    props.msgChannel.set(undefined);
+    try {
+      props.msgChannel.set(undefined);
+      props.msgClient.set(undefined);
+      props.videoClient.set(undefined);
 
-    await props.msgClient.value?.logout();
-    props.msgClient.set(undefined);
+      await props.msgChannel.value?.leave();
+      await props.msgClient.value?.logout();
+      await props.videoClient.value?.leave();
 
-    await props.videoClient.value?.leave();
-    props.videoClient.set(undefined);
-
-    props.joined.set(false);
+      props.joined.set(false);
+    } catch (e) {
+      setErrMsg(String(e));
+    }
   }
 
   return (
@@ -133,7 +142,22 @@ function RoomController(props: ChatControllerProps) {
         <Col> Room Control</Col>
       </Row>
       <Row>
-        <Col xs={6} md={8} lg={12}>
+        <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
+          <FloatingLabel label='AppID' controlId='appId'>
+            <Form.Control placeholder="appId"
+              onChange={(e) => { setAppID(e.target.value) }}
+              disabled={props.joined.value || hiddenAppCertInput} />
+          </FloatingLabel>
+        </Col>
+        <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
+          <FloatingLabel label='AppCertification' controlId='appCertification'>
+            <Form.Control placeholder="appCertification"
+              type="password"
+              onChange={(e) => { setAppCert(e.target.value) }}
+              disabled={props.joined.value || hiddenAppCertInput} />
+          </FloatingLabel>
+        </Col>
+        <Col xs={6} md={true} lg={12}>
           <FloatingLabel label='Channel' controlId='channel'>
             <Form.Control placeholder="test-web-room"
               value={props.channel.value}
@@ -141,7 +165,7 @@ function RoomController(props: ChatControllerProps) {
               disabled={props.joined.value} />
           </FloatingLabel>
         </Col>
-        <Col xs={6} md={4} lg={12}>
+        <Col xs={6} md={3} lg={12}>
           <Row xs={2} style={{ height: '100%' }}>
             <Col>
               <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}
@@ -160,6 +184,12 @@ function RoomController(props: ChatControllerProps) {
           </Row>
         </Col>
       </Row>
+      <Modal show={Boolean(errMsg)} onHide={() => setErrMsg(undefined)}>
+        <Modal.Header closeButton>
+          <Modal.Title> Error </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>{errMsg}</Modal.Body>
+      </Modal>
     </>
   )
 }

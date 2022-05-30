@@ -29,7 +29,7 @@ export default function Call() {
   };
 
   return (
-    <Container fluid={true}>
+    <Container fluid={false}>
       <Row>
         <Col lg={3}>
           <ChatController {...gs} />
