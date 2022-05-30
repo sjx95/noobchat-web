@@ -120,8 +120,9 @@ export function ChatController(props: ChatControllerProps) {
       client.off('user-unpublished', handleUserUnpublished);
       client.off('user-joined', handleUserJoined);
       client.off('user-left', handleUserLeft);
+      setRemoteUsers([]);
     };
-  }, [props.videoClient.value, props.videoClient.set, props.rtcRemoteUsers.set]);
+  }, [props.videoClient.value, props.rtcRemoteUsers.set]);
 
 
   async function join() {
