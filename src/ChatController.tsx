@@ -9,21 +9,6 @@ export const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
 const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
 export const userID = Math.floor(Math.random() * (1 << 31 - 1));
 
-const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
-const msgClient = AgoraRTM.createInstance(appID);
-
-function genRTCToken(channelName: string): string {
-  const uid = 0;
-  const role = RtcRole.PUBLISHER;
-  const privilegeExpiredTs = 0
-  return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
-}
-
-function genRTMToken(): string {
-  const token = RtmTokenBuilder.buildToken(appID, appCertificate, userID.toString(), RtmRole.Rtm_User, 86400);
-  return token;
-}
-
 interface ChatControllerProps {
   channel: IWrappedState<string>
   joined: IWrappedState<boolean>
@@ -129,6 +114,21 @@ export function ChatController(props: ChatControllerProps) {
     // if (!props.videoClient.value || !props.msgClient.value) return;
 
     const channelName = props.channel.value;
+
+    const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
+    const msgClient = AgoraRTM.createInstance(appID);
+
+    function genRTCToken(channelName: string): string {
+      const uid = 0;
+      const role = RtcRole.PUBLISHER;
+      const privilegeExpiredTs = 0
+      return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
+    }
+    
+    function genRTMToken(): string {
+      const token = RtmTokenBuilder.buildToken(appID, appCertificate, userID.toString(), RtmRole.Rtm_User, 86400);
+      return token;
+    }
 
     await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
     props.videoClient.set(videoClient);
