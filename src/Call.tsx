@@ -29,12 +29,12 @@ export default function Call() {
   };
 
   return (
-    <Container fluid={false}>
+    <Container fluid>
       <Row>
-        <Col lg={3}>
+        <Col lg={3} xl={2}>
           <ChatController {...gs} />
         </Col>
-        <Col lg={6}>
+        <Col lg={6} xl={8}>
           <ChatVideos userID={0}
             videoClient={gs.videoClient.value}
             remoteUsers={gs.rtcRemoteUsers.value}
@@ -42,7 +42,7 @@ export default function Call() {
             localAudioTrack={gs.localAudioTrack.value}
           />
         </Col>
-        <Col lg={3}>
+        <Col lg={3} xl={2}>
           <ChatTexts msgChannel={gs.msgChannel.value} />
         </Col>
       </Row>

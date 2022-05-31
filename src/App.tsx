@@ -13,7 +13,7 @@ export default function App() {
 function AppNavbar() {
     return (
         <Navbar bg="dark" variant="dark" expand="md">
-            <Container>
+            <Container fluid>
                 <Navbar.Brand>Noob Chat</Navbar.Brand>
                 {/* <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
