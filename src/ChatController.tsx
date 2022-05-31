@@ -2,27 +2,10 @@ import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect } from "react"
-import { Form, Row, Col, FloatingLabel, Button } from "react-bootstrap"
+import { Form, Row, Col, FloatingLabel, Button, Modal } from "react-bootstrap"
 import { IWrappedState } from "./hooks/useWrappedStates"
 
-export const appID = process.env.REACT_APP_AGORA_APP_ID ?? ""
-const appCertificate = process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? ""
 export const userID = Math.floor(Math.random() * (1 << 31 - 1));
-
-const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
-const msgClient = AgoraRTM.createInstance(appID);
-
-function genRTCToken(channelName: string): string {
-  const uid = 0;
-  const role = RtcRole.PUBLISHER;
-  const privilegeExpiredTs = 0
-  return RtcTokenBuilder.buildTokenWithUid(appID, appCertificate, channelName, uid, role, privilegeExpiredTs)
-}
-
-function genRTMToken(): string {
-  const token = RtmTokenBuilder.buildToken(appID, appCertificate, userID.toString(), RtmRole.Rtm_User, 86400);
-  return token;
-}
 
 interface ChatControllerProps {
   channel: IWrappedState<string>
@@ -37,6 +20,181 @@ interface ChatControllerProps {
 };
 
 export function ChatController(props: ChatControllerProps) {
+
+  useEffect(() => {
+    const client = props.videoClient.value;
+    const setRemoteUsers = props.rtcRemoteUsers.set;
+    if (!client) return;
+    setRemoteUsers(client.remoteUsers);
+
+    const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
+      await client.subscribe(user, mediaType);
+      // toggle rerender while state of remoteUsers changed.
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
+      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
+    }
+    client.on('user-published', handleUserPublished);
+    client.on('user-unpublished', handleUserUnpublished);
+    client.on('user-joined', handleUserJoined);
+    client.on('user-left', handleUserLeft);
+
+    return () => {
+      client.off('user-published', handleUserPublished);
+      client.off('user-unpublished', handleUserUnpublished);
+      client.off('user-joined', handleUserJoined);
+      client.off('user-left', handleUserLeft);
+      setRemoteUsers([]);
+    };
+  }, [props.videoClient.value, props.rtcRemoteUsers.set]);
+
+
+
+
+  return (
+    <Form>
+      <RoomController {...props} />
+      <DeviceController {...props} />
+      <Row hidden>
+        <Col> Advance Control</Col>
+      </Row>
+      <Row hidden>
+        <Col>
+          <Form.Switch label={`Mute Local Audio`} />
+          <Form.Switch label={`Mute Remote Audio`} />
+          <Form.Switch label={`Subscribe Remote Video`} />
+          <Form.Switch label={`Subscribe Remote Audio`} />
+        </Col>
+      </Row>
+    </Form >
+  )
+}
+
+function RoomController(props: ChatControllerProps) {
+
+  const [hiddenAppCertInput] = useState((process.env.REACT_APP_AGORA_APP_ID && process.env.REACT_APP_AGORA_APP_CERTIFICATE && true) || false);
+  const [appID, setAppID] = useState(process.env.REACT_APP_AGORA_APP_ID ?? "");
+  const [appCert, setAppCert] = useState(process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? "");
+  const [errMsg, setErrMsg] = useState<string>();
+
+  async function join() {
+    // if (!props.videoClient.value || !props.msgClient.value) return;
+
+    function genRTCToken(channelName: string): string {
+      const uid = 0;
+      const role = RtcRole.PUBLISHER;
+      const privilegeExpiredTs = 0
+      return RtcTokenBuilder.buildTokenWithUid(appID, appCert, channelName, uid, role, privilegeExpiredTs)
+    }
+
+    function genRTMToken(): string {
+      const token = RtmTokenBuilder.buildToken(appID, appCert, userID.toString(), RtmRole.Rtm_User, 86400);
+      return token;
+    }
+
+    try {
+      const channelName = props.channel.value;
+      const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
+      const msgClient = AgoraRTM.createInstance(appID);
+
+      await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
+      await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
+      const channel = msgClient.createChannel(channelName);
+      await channel.join();
+
+      props.videoClient.set(videoClient);
+      props.msgClient.set(msgClient);
+      props.msgChannel.set(channel);
+
+      props.joined.set(true);
+    } catch (e) {
+      setErrMsg(String(e));
+    }
+
+  }
+
+  async function leave() {
+    try {
+      props.msgChannel.set(undefined);
+      props.msgClient.set(undefined);
+      props.videoClient.set(undefined);
+
+      await props.msgChannel.value?.leave();
+      await props.msgClient.value?.logout();
+      await props.videoClient.value?.leave();
+
+      props.joined.set(false);
+    } catch (e) {
+      setErrMsg(String(e));
+    }
+  }
+
+  return (
+    <>
+      <Row>
+        <Col> Room Control</Col>
+      </Row>
+      <Row>
+        <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
+          <FloatingLabel label='AppID' controlId='appId'>
+            <Form.Control placeholder="appId"
+              onChange={(e) => { setAppID(e.target.value) }}
+              disabled={props.joined.value || hiddenAppCertInput} />
+          </FloatingLabel>
+        </Col>
+        <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
+          <FloatingLabel label='AppCertification' controlId='appCertification'>
+            <Form.Control placeholder="appCertification"
+              type="password"
+              onChange={(e) => { setAppCert(e.target.value) }}
+              disabled={props.joined.value || hiddenAppCertInput} />
+          </FloatingLabel>
+        </Col>
+        <Col xs={6} md={true} lg={12}>
+          <FloatingLabel label='Channel' controlId='channel'>
+            <Form.Control placeholder="test-web-room"
+              value={props.channel.value}
+              onChange={(e) => { props.channel.set(e.target.value) }}
+              disabled={props.joined.value} />
+          </FloatingLabel>
+        </Col>
+        <Col xs={6} md={3} lg={12}>
+          <Row xs={2} style={{ height: '100%' }}>
+            <Col>
+              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}
+                onClick={join}
+                disabled={props.joined.value}>
+                Join
+              </Button>
+            </Col>
+            <Col>
+              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}
+                onClick={leave}
+                disabled={!props.joined.value}>
+                Leave
+              </Button>
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+      <Modal show={Boolean(errMsg)} onHide={() => setErrMsg(undefined)}>
+        <Modal.Header closeButton>
+          <Modal.Title> Error </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>{errMsg}</Modal.Body>
+      </Modal>
+    </>
+  )
+}
+
+function DeviceController(props: ChatControllerProps) {
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   useEffect(() => { updateDevices(); }, [])
@@ -90,104 +248,8 @@ export function ChatController(props: ChatControllerProps) {
     }
   }, [props.videoClient.value, audioInput, localAudioTrack, setLocalAudioTrack]);
 
-  useEffect(() => {
-    const client = props.videoClient.value;
-    const setRemoteUsers = props.rtcRemoteUsers.set;
-    if (!client) return;
-    setRemoteUsers(client.remoteUsers);
-
-    const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
-      await client.subscribe(user, mediaType);
-      // toggle rerender while state of remoteUsers changed.
-      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
-    }
-    const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
-      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
-    }
-    const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
-      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
-    }
-    const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
-      setRemoteUsers(remoteUsers => Array.from(client.remoteUsers));
-    }
-    client.on('user-published', handleUserPublished);
-    client.on('user-unpublished', handleUserUnpublished);
-    client.on('user-joined', handleUserJoined);
-    client.on('user-left', handleUserLeft);
-
-    return () => {
-      client.off('user-published', handleUserPublished);
-      client.off('user-unpublished', handleUserUnpublished);
-      client.off('user-joined', handleUserJoined);
-      client.off('user-left', handleUserLeft);
-    };
-  }, [props.videoClient.value, props.videoClient.set, props.rtcRemoteUsers.set]);
-
-
-  async function join() {
-    // if (!props.videoClient.value || !props.msgClient.value) return;
-
-    const channelName = props.channel.value;
-
-    await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
-    props.videoClient.set(videoClient);
-
-    await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
-    props.msgClient.set(msgClient);
-
-    const channel = msgClient.createChannel(channelName);
-    await channel.join();
-
-    props.msgChannel.set(channel);
-    props.joined.set(true);
-  }
-
-  async function leave() {
-    await props.msgChannel.value?.leave();
-    props.msgChannel.set(undefined);
-
-    await props.msgClient.value?.logout();
-    props.msgClient.set(undefined);
-
-    await props.videoClient.value?.leave();
-    props.videoClient.set(undefined);
-
-    props.joined.set(false);
-  }
-
   return (
-    <Form>
-      <Row>
-        <Col> Room Control</Col>
-      </Row>
-      <Row>
-        <Col xs={6} md={8} lg={12}>
-          <FloatingLabel label='Channel' controlId='channel'>
-            <Form.Control placeholder="test-web-room"
-              value={props.channel.value}
-              onChange={(e) => { props.channel.set(e.target.value) }}
-              disabled={props.joined.value} />
-          </FloatingLabel>
-        </Col>
-        <Col xs={6} md={4} lg={12}>
-          <Row xs={2} style={{ height: '100%' }}>
-            <Col>
-              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}
-                onClick={join}
-                disabled={props.joined.value}>
-                Join
-              </Button>
-            </Col>
-            <Col>
-              <Button style={{ height: '100%', width: '100%', alignItems: 'stretch' }}
-                onClick={leave}
-                disabled={!props.joined.value}>
-                Leave
-              </Button>
-            </Col>
-          </Row>
-        </Col>
-      </Row >
+    <>
       <Row>
         <Col> Local Device Control</Col>
       </Row>
@@ -219,17 +281,6 @@ export function ChatController(props: ChatControllerProps) {
           </Form.Select>
         </FloatingLabel>
       </Row>
-      <Row hidden>
-        <Col> Advance Control</Col>
-      </Row>
-      <Row hidden>
-        <Col>
-          <Form.Switch label={`Mute Local Audio`} />
-          <Form.Switch label={`Mute Remote Audio`} />
-          <Form.Switch label={`Subscribe Remote Video`} />
-          <Form.Switch label={`Subscribe Remote Audio`} />
-        </Col>
-      </Row>
-    </Form >
+    </>
   )
 }
