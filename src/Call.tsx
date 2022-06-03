@@ -2,7 +2,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { RtmChannel, RtmClient } from 'agora-rtm-sdk';
 import { useWrappedState } from './hooks/useWrappedStates';
-import { ChatController } from './ChatController';
+import { ChatController, userID } from './ChatController';
 import { ChatVideos } from './ChatVideos';
 import { ChatTexts } from './ChatTexts';
 
@@ -35,7 +35,7 @@ export default function Call() {
           <ChatController {...gs} />
         </Col>
         <Col lg={6} xl={8}>
-          <ChatVideos userID={0}
+          <ChatVideos userID={userID}
             videoClient={gs.videoClient.value}
             remoteUsers={gs.rtcRemoteUsers.value}
             localVideoTrack={gs.localVideoTrack.value}
