@@ -25,7 +25,6 @@ export function ChatController(props: ChatControllerProps) {
     const client = props.videoClient.value;
     const setRemoteUsers = props.rtcRemoteUsers.set;
     if (!client) return;
-    setRemoteUsers(client.remoteUsers);
 
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
       await client.subscribe(user, mediaType);
@@ -46,6 +45,11 @@ export function ChatController(props: ChatControllerProps) {
     client.on('user-joined', handleUserJoined);
     client.on('user-left', handleUserLeft);
 
+    client.remoteUsers.map(async (user) => {
+      user.hasAudio && !user.audioTrack && await client.subscribe(user, 'audio');
+      user.hasVideo && !user.videoTrack && await client.subscribe(user, 'video');
+      setRemoteUsers(client.remoteUsers);
+    });
     return () => {
       client.off('user-published', handleUserPublished);
       client.off('user-unpublished', handleUserUnpublished);
