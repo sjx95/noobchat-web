@@ -61,7 +61,7 @@ export function useAzureAuth() {
 
 	const [publicUserInfo, setPublicUserInfo] = useState<IPublicUserInfo>();
 	useEffect(() => {
-		if (!clientPrinciple) setPublicUserInfo(undefined);
+		if (clientPrinciple?.identityProvider !== 'github') setPublicUserInfo(undefined);
 		else fetch('https://api.github.com/users/' + clientPrinciple.userDetails).then(
 			(rsp) => rsp.json()
 		).then(
