@@ -1,13 +1,12 @@
-import {useEffect, useState} from "react";
-import {Badge, Container, Navbar, Image} from "react-bootstrap";
+import { useContext } from "react";
+import { Badge, Container, Navbar, Image } from "react-bootstrap";
+import { AuthContext } from "./hooks/useAzureAuth";
 
 export interface AppNavbarProps {
 	fluid: boolean,
 }
 
 export function AppNavbar() {
-
-
 	return (
 		<Navbar bg="dark" variant="dark" expand="md">
 			<Container fluid>
@@ -35,40 +34,26 @@ export function AppNavbar() {
 
 function AccountController() {
 
-	const [clientPrinciple, setClientPrinciple] = useState<any>();
-	useEffect(() => {
-		fetch('/.auth/me').then(
-			(rsp) => rsp.json()
-		).then(
-			(payload) => setClientPrinciple(payload.clientPrincipal)
-		);
-	}, [setClientPrinciple])
+	const auth = useContext(AuthContext);
 
-	const [publicUserInfo, setPublicUserInfo] = useState<any>();
-	useEffect(() => {
-		if (!clientPrinciple) setPublicUserInfo(undefined);
-		else fetch('https://api.github.com/users/' + clientPrinciple.userDetails).then(
-			(rsp) => rsp.json()
-		).then(
-			(payload) => setPublicUserInfo(payload)
-		);
-	}, [clientPrinciple, setPublicUserInfo]);
-
-	if (clientPrinciple?.identityProvider !== 'github') return (
+	if (auth?.clientPrinciple?.identityProvider !== 'github') return (
 		<Navbar.Text>
 			<a href='/.auth/login/github'> Login </a>
 		</Navbar.Text>
 	);
-	else return (
+
+	return (
 		<Navbar.Text>
 			Signed in as:
 			<Badge pill bg='secondary'>
-				<Image src={publicUserInfo?.avatar_url} alt={'G'} height='40' width='40' roundedCircle />
-				{publicUserInfo?.name}
+				{
+					auth.publicUserInfo &&
+					<Image src={auth.publicUserInfo?.avatar_url} alt={'A'} height='40' width='40' roundedCircle />
+				}
+				{auth.publicUserInfo?.name || auth.clientPrinciple.userDetails}
 			</Badge>
 			|
 			<a href='/.auth/logout'> Logout</a>
 		</Navbar.Text >
-	)
-
+	);
 }
