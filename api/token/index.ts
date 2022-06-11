@@ -18,8 +18,8 @@ const httpTrigger: AzureFunction = async function (context: Context, req: HttpRe
             return;
         }
 
-        const appId = process.env.REACT_APP_AGORA_APP_ID;
-        const appCert = process.env.REACT_APP_AGORA_APP_CERTIFICATE;
+        const appId = process.env.REACT_API_AGORA_APP_ID;
+        const appCert = process.env.REACT_API_AGORA_APP_CERTIFICATE;
         if (!appId || !appCert) {
             context.res = { status: 500, body: 'bad app_id and app_cert' };
             return;
