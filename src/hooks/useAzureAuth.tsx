@@ -55,7 +55,12 @@ export function useAzureAuth() {
 		fetch('/.auth/me').then(
 			(rsp) => rsp.json()
 		).then(
-			(payload) => setClientPrinciple(payload.clientPrincipal)
+			(payload: { clientPrincipal: IClientPrinciple }) => {
+				if (payload.clientPrincipal?.identityProvider === 'github')
+					setClientPrinciple(payload.clientPrincipal);
+				else
+					setClientPrinciple(undefined);
+			}
 		);
 	}, [setClientPrinciple])
 

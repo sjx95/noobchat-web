@@ -1,8 +1,9 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access-token"
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useContext } from "react"
 import { Form, Row, Col, FloatingLabel, Button, Modal } from "react-bootstrap"
+import { AuthContext } from "./hooks/useAzureAuth"
 import { IWrappedState } from "./hooks/useWrappedStates"
 
 export const userID = Math.floor(Math.random() * (1 << 31 - 1));
@@ -50,6 +51,7 @@ export function ChatController(props: ChatControllerProps) {
       user.hasVideo && !user.videoTrack && await client.subscribe(user, 'video');
       setRemoteUsers(client.remoteUsers);
     });
+
     return () => {
       client.off('user-published', handleUserPublished);
       client.off('user-unpublished', handleUserUnpublished);
@@ -83,39 +85,43 @@ export function ChatController(props: ChatControllerProps) {
 
 function RoomController(props: ChatControllerProps) {
 
-  const [hiddenAppCertInput] = useState((process.env.REACT_APP_AGORA_APP_ID && process.env.REACT_APP_AGORA_APP_CERTIFICATE && true) || false);
-  const [appID, setAppID] = useState(process.env.REACT_APP_AGORA_APP_ID ?? "");
+  const auth = useContext(AuthContext);
+  const hiddenAppCertInput: boolean = auth.clientPrinciple || (process.env.REACT_APP_AGORA_APP_ID && process.env.REACT_APP_AGORA_APP_CERTIFICATE) ? true : false;
+  const [appId, setAppId] = useState(process.env.REACT_APP_AGORA_APP_ID ?? "");
   const [appCert, setAppCert] = useState(process.env.REACT_APP_AGORA_APP_CERTIFICATE ?? "");
   const [errMsg, setErrMsg] = useState<string>();
 
-  async function join() {
-    // if (!props.videoClient.value || !props.msgClient.value) return;
 
-    function genRTCToken(channelName: string): string {
-      const uid = 0;
-      const role = RtcRole.PUBLISHER;
-      const privilegeExpiredTs = 0
-      return RtcTokenBuilder.buildTokenWithUid(appID, appCert, channelName, uid, role, privilegeExpiredTs)
+  async function join() {
+
+    function genToken(channel: string, userId: number): [string, string, string] {
+      return [appId,
+        RtcTokenBuilder.buildTokenWithUid(appId, appCert, channel, userId, RtcRole.PUBLISHER, 0),
+        RtmTokenBuilder.buildToken(appId, appCert, userId.toString(), RtmRole.Rtm_User, 0),
+      ]
     }
 
-    function genRTMToken(): string {
-      const token = RtmTokenBuilder.buildToken(appID, appCert, userID.toString(), RtmRole.Rtm_User, 86400);
-      return token;
+    async function fetchToken(channel: string, userId: number): Promise<[string, string, string]> {
+      const res = await fetch(`/api/token?channel=${channel}&userId=${userId}`)
+      const { appId, rtcToken, rtmToken } = await res.json();
+      return [appId, rtcToken, rtmToken]
     }
 
     try {
-      const channelName = props.channel.value;
+      const channel = props.channel.value;
+      const [appId, rtcToken, rtmToken] = auth.clientPrinciple ?
+        await fetchToken(channel, userID) : genToken(channel, userID);
       const videoClient = AgoraRTC.createClient({ codec: 'h264', mode: 'rtc' });
-      const msgClient = AgoraRTM.createInstance(appID);
+      const msgClient = AgoraRTM.createInstance(appId);
 
-      await videoClient.join(appID, channelName, genRTCToken(channelName), userID);
-      await msgClient.login({ uid: userID.toString(), token: genRTMToken() });
-      const channel = msgClient.createChannel(channelName);
-      await channel.join();
+      await videoClient.join(appId, channel, rtcToken, userID);
+      await msgClient.login({ uid: userID.toString(), token: rtmToken });
+      const msgChannel = msgClient.createChannel(channel);
+      await msgChannel.join();
 
       props.videoClient.set(videoClient);
       props.msgClient.set(msgClient);
-      props.msgChannel.set(channel);
+      props.msgChannel.set(msgChannel);
 
       props.joined.set(true);
     } catch (e) {
@@ -149,7 +155,7 @@ function RoomController(props: ChatControllerProps) {
         <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
           <FloatingLabel label='AppID' controlId='appId'>
             <Form.Control placeholder="appId"
-              onChange={(e) => { setAppID(e.target.value) }}
+              onChange={(e) => { setAppId(e.target.value) }}
               disabled={props.joined.value || hiddenAppCertInput} />
           </FloatingLabel>
         </Col>
@@ -163,7 +169,7 @@ function RoomController(props: ChatControllerProps) {
         </Col>
         <Col xs={6} md={true} lg={12}>
           <FloatingLabel label='Channel' controlId='channel'>
-            <Form.Control placeholder="test-web-room"
+            <Form.Control placeholder="test-web-room" required
               value={props.channel.value}
               onChange={(e) => { props.channel.set(e.target.value) }}
               disabled={props.joined.value} />
@@ -286,5 +292,5 @@ function DeviceController(props: ChatControllerProps) {
         </FloatingLabel>
       </Row>
     </>
-  )
+  );
 }
