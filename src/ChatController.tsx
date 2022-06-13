@@ -2,7 +2,7 @@ import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect, useContext } from "react"
-import { Form, Row, Col, FloatingLabel, Button, Modal } from "react-bootstrap"
+import { Form, Row, Col, FloatingLabel, Button, Modal, Alert } from "react-bootstrap"
 import { AuthContext } from "./hooks/useAzureAuth"
 import { IWrappedState } from "./hooks/useWrappedStates"
 
@@ -149,7 +149,15 @@ function RoomController(props: ChatControllerProps) {
   return (
     <>
       <Row>
-        <Col> Room Control</Col>
+        <Col>Room Control</Col>
+      </Row>
+      <Row>
+        <Col>
+          <Alert variant="info" show={!!process.env.REACT_APP_AZURE_AUTH && !auth.clientPrinciple && !hiddenAppCertInput}>
+            Please <Alert.Link href="/.auth/login/github">login</Alert.Link> with GitHub account,
+            or join with yourselves Agora AppID.
+          </Alert>
+        </Col>
       </Row>
       <Row>
         <Col xs={6} md={3} lg={12} hidden={hiddenAppCertInput}>
