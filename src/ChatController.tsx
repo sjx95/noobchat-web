@@ -1,5 +1,5 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder, RtmRole } from "agora-access-token"
-import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, MicrophoneAudioTrackInitConfig } from "agora-rtc-sdk-ng"
+import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng"
 import AgoraRTM, { RtmClient, RtmChannel } from "agora-rtm-sdk"
 import { useState, useEffect, useContext } from "react"
 import { Form, Row, Col, FloatingLabel, Button, Modal, Alert } from "react-bootstrap"
@@ -213,7 +213,6 @@ function RoomController(props: ChatControllerProps) {
 }
 
 function DeviceController(props: ChatControllerProps) {
-
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   useEffect(() => { updateDevices(); }, [])
   async function updateDevices() {
@@ -221,48 +220,50 @@ function DeviceController(props: ChatControllerProps) {
     setDevices(ds);
   }
 
-  const [videoInput, setVideoInput] = useState('');
+  const [videoInput, setVideoInput] = useState<string>('mute');
   const { value: localVideoTrack, set: setLocalVideoTrack } = props.localVideoTrack;
   useEffect(() => {
-    if (!props.videoClient.value || videoInput === '') {
+    const [mute, unspecific] = [videoInput === 'mute', videoInput === 'unspecific'];
+
+    if (!props.videoClient.value || mute) {
       !localVideoTrack || props.videoClient.value?.unpublish(localVideoTrack);
       localVideoTrack?.close();
       setLocalVideoTrack(undefined);
       return;
     }
 
-    if (videoInput !== '') {
-      if (!localVideoTrack) {
-        AgoraRTC.createCameraVideoTrack({ cameraId: videoInput }).then((track) => {
-          setLocalVideoTrack(track);
-          props.videoClient.value?.publish(track);
-        });
-      } else {
-        localVideoTrack.setDevice(videoInput);
-      }
+    if (!localVideoTrack) {
+      AgoraRTC.createCameraVideoTrack({ cameraId: !unspecific ? videoInput : undefined }).then((track) => {
+        setLocalVideoTrack(track);
+        props.videoClient.value?.publish(track);
+      });
+    } else {
+      !unspecific && localVideoTrack.setDevice(videoInput);
     }
   }, [props.videoClient.value, videoInput, localVideoTrack, setLocalVideoTrack]);
 
-  const [audioInput, setAudioInput] = useState('default');
+  const [audioInput, setAudioInput] = useState<string>('unspecific');
   const { value: localAudioTrack, set: setLocalAudioTrack } = props.localAudioTrack;
   useEffect(() => {
-    if (!props.videoClient.value || audioInput === '') {
+    const [mute, unspecific] = [audioInput === 'mute', audioInput === 'unspecific'];
+
+    if (!props.videoClient.value || mute) {
       !localAudioTrack || props.videoClient.value?.unpublish(localAudioTrack);
       localAudioTrack?.close();
       setLocalAudioTrack(undefined);
       return;
     }
 
-    if (audioInput !== '') {
-      if (!localAudioTrack) {
-        const miccfg: MicrophoneAudioTrackInitConfig = { microphoneId: audioInput, AEC: true, AGC: true, ANS: true };
-        AgoraRTC.createMicrophoneAudioTrack(miccfg).then((track) => {
-          setLocalAudioTrack(track);
-          props.videoClient.value?.publish(track);
-        });
-      } else {
-        localAudioTrack.setDevice(audioInput);
-      }
+    if (!localAudioTrack) {
+      AgoraRTC.createMicrophoneAudioTrack({
+        microphoneId: !unspecific ? audioInput : undefined,
+        AEC: true, AGC: true, ANS: true,
+      }).then((track) => {
+        setLocalAudioTrack(track);
+        props.videoClient.value?.publish(track);
+      });
+    } else {
+      !unspecific && localAudioTrack.setDevice(audioInput);
     }
   }, [props.videoClient.value, audioInput, localAudioTrack, setLocalAudioTrack]);
 
@@ -279,14 +280,16 @@ function DeviceController(props: ChatControllerProps) {
         </Col>
         <FloatingLabel as={Col} label='Video Input'>
           <Form.Select value={videoInput} onChange={(e) => setVideoInput(e.target.value)}>
-            <option value=""> Disable </option>
+            <option value='mute'> ** Mute ** </option>
+            <option value='unspecific' hidden={localVideoTrack ? true : false}> ** Unspecific ** </option>
             {devices.filter((d) => { return d.kind === 'videoinput' })
               .map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
         </FloatingLabel>
         <FloatingLabel as={Col} label='Audio Input'>
           <Form.Select value={audioInput} onChange={(e) => setAudioInput(e.target.value)}>
-            <option value=""> Mute </option>
+            <option value='mute'> ** Mute ** </option>
+            <option value='unspecific' hidden={localAudioTrack ? true : false}> ** Unspecific ** </option>
             {devices.filter((d) => { return d.kind === 'audioinput' })
               .map((d) => { return (<option key={d.deviceId} value={d.deviceId}> {d.label} </option>) })}
           </Form.Select>
