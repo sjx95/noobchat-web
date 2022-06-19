@@ -10,7 +10,8 @@
     "test": "echo \"No tests yet...\""
   },
   "dependencies": {
-    "agora-access-token": "^2.0.4"
+    "agora-access-token": "^2.0.4",
+    "node-fetch": "^3.2.6"
   },
   "devDependencies": {
     "@azure/functions": "^3.0.0",
