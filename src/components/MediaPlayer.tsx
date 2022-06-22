@@ -6,6 +6,7 @@ export interface VideoPlayerProps {
   audioTrack: ILocalAudioTrack | IRemoteAudioTrack | undefined;
   disableVideo?: boolean;
   disableAudio?: boolean;
+  gainRange?: [number, number];
 }
 
 const MediaPlayer = (props: VideoPlayerProps) => {
@@ -36,8 +37,11 @@ const MediaPlayer = (props: VideoPlayerProps) => {
     return () => clearInterval(id);
   }, [props.audioTrack]);
 
-  const [volume, setVolume] = useState(100);
-  useEffect(() => props.audioTrack?.setVolume(volume), [volume, props.audioTrack]);
+  const [volume, setVolume] = useState(0);
+  useEffect(() => {
+    const amp = Math.round(100 * (10 ** (volume / 20)));
+    props.audioTrack?.setVolume(amp);
+  }, [volume, props.audioTrack]);
 
   return (
     <div>
@@ -47,9 +51,9 @@ const MediaPlayer = (props: VideoPlayerProps) => {
       </div>
       <div>
         Track Volume:
-        <input type='range' min={0} max={200} step={10} value={volume}
+        <input type='range' min={props.gainRange?.[0] || -40} max={props.gainRange?.[1] || 0} step={1} value={volume}
           onChange={(event) => setVolume(event.target.valueAsNumber)} />
-        {volume} %
+        {volume} dB
       </div>
     </div>
   );

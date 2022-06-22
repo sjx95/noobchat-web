@@ -15,7 +15,9 @@ export function ChatVideos(props: ChatVideosProps) {
         <div>
             <div className='local-player-wrapper'>
                 <p className='local-player-text'> localTrack({props.userID}) </p>
-                <MediaPlayer videoTrack={props.localVideoTrack} audioTrack={props.localAudioTrack} disableAudio={true} />
+                <MediaPlayer
+                    videoTrack={props.localVideoTrack} audioTrack={props.localAudioTrack}
+                    gainRange={[-40, 20]} disableAudio={true} />
             </div>
             {props.remoteUsers?.map(user => (
                 <div className='remote-player-wrapper' key={user.uid}>
