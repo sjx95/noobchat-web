@@ -1,5 +1,5 @@
-import { ILocalAudioTrack, ILocalVideoTrack, IAgoraRTCRemoteUser, IAgoraRTCClient, UID } from "agora-rtc-sdk-ng"
-import { useState } from "react"
+import { ILocalAudioTrack, ILocalVideoTrack, IAgoraRTCRemoteUser, IAgoraRTCClient, NetworkQuality } from "agora-rtc-sdk-ng"
+import { ReactElement, useEffect, useState } from "react"
 import { Badge } from "react-bootstrap"
 import MediaPlayer from "./components/MediaPlayer"
 import useAgroaRTCQuality from "./hooks/useAgoraRTCQuality"
@@ -18,14 +18,44 @@ export function ChatVideos(props: ChatVideosProps) {
 
     const remotes = props.remoteUsers?.map((user) => {
         const rq = remoteQualities.get(user.uid);
-        const netQuality = Math.min(rq?.NetworkQuality?.uplinkNetworkQuality ?? 0, rq?.NetworkQuality?.downlinkNetworkQuality ?? 0);
         const e2eDelay = Math.max(rq?.AudioStats?.end2EndDelay ?? 0, rq?.AudioStats?.end2EndDelay ?? 0);
         const netDelay = Math.max(rq?.AudioStats?.transportDelay ?? 0, rq?.AudioStats?.transportDelay ?? 0);
         return {
-            user, netQuality, e2eDelay, netDelay,
+            user, e2eDelay, netDelay,
             audioE2EDelay: rq?.AudioStats?.end2EndDelay
         };
     });
+
+    const [localBadge, setLocalBadge] = useState<ReactElement>();
+    useEffect(() => {
+        if (!props.videoClient) {
+            setLocalBadge(undefined);
+            return
+        };
+
+        const listener = (stats: NetworkQuality) => {
+            const quality = Math.max(stats.uplinkNetworkQuality, stats.downlinkNetworkQuality);
+            let text: string = 'unknown';
+            let color: string = 'secondary';
+
+            if (quality === 0) {
+                text = 'unknown';
+                color = 'secondary';
+            } else if (quality <= 2) {
+                text = 'great';
+                color = 'success';
+            } else if (quality <= 4) {
+                text = 'good';
+                color = 'warning';
+            } else {
+                text = 'poor';
+                color = 'danger';
+            };
+            setLocalBadge(<Badge bg={color}>network: {text}({quality})</Badge>)
+        };
+        props.videoClient.on('network-quality', listener);
+        return () => { props.videoClient?.off('network-quality', listener) }
+    }, [props.videoClient, setLocalBadge]);
 
     const latencyColor = (latency: number | undefined): string => {
         if (latency === undefined) return 'secondary';
@@ -34,12 +64,13 @@ export function ChatVideos(props: ChatVideosProps) {
         return 'success';
     };
 
-
-
     return (
         <div>
             <div className='local-player-wrapper'>
-                <p className='local-player-text'> localTrack({props.userID}) </p>
+                <p className='local-player-text'>
+                    <span>localTrack({props.userID})</span>
+                    {localBadge}
+                </p>
                 <MediaPlayer
                     videoTrack={props.localVideoTrack} audioTrack={props.localAudioTrack}
                     gainRange={[-40, 20]} disableAudio={true} />
