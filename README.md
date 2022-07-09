@@ -1,4 +1,10 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Noob Chat
+
+![License](https://img.shields.io/github/license/sjx95/noobchat-web)
+[![Azure Static Web Apps CI/CD](https://github.com/sjx95/noobchat-web/actions/workflows/azure-static-web-apps-ambitious-field-08b1dde00.yml/badge.svg)](https://github.com/sjx95/noobchat-web/actions/workflows/azure-static-web-apps-ambitious-field-08b1dde00.yml)
+
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app),
+and initially forked from [AgoraIO/API-Examples-Web/ReactDemo](https://github.com/AgoraIO/API-Examples-Web/tree/main/ReactDemo).
 
 ## Available Scripts
 
