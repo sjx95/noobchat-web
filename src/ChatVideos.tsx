@@ -3,6 +3,7 @@ import { ReactElement, useEffect, useState } from "react"
 import { Badge } from "react-bootstrap"
 import MediaPlayer from "./components/MediaPlayer"
 import useAgroaRTCQuality from "./hooks/useAgoraRTCQuality"
+import { IPublicUserInfo } from "./hooks/useAzureAuth"
 
 export interface ChatVideosProps {
     userID?: number
@@ -10,6 +11,7 @@ export interface ChatVideosProps {
     localVideoTrack?: ILocalVideoTrack
     remoteUsers?: IAgoraRTCRemoteUser[]
     videoClient?: IAgoraRTCClient
+    remoteUserInfo?: Map<number, IPublicUserInfo>
 }
 
 export function ChatVideos(props: ChatVideosProps) {
@@ -79,7 +81,8 @@ export function ChatVideos(props: ChatVideosProps) {
                 <div className='remote-player-wrapper' key={remote.user.uid}>
                     <p className='remote-player-text'>
                         <span>
-                            {`remoteVideo(${remote.user.uid})`}
+                            {props.remoteUserInfo?.get(remote.user.uid as number)?.name ?? 'remoteTrack'}
+                            ({remote.user.uid})
                         </span>
                         <Badge bg={latencyColor(remote.audioE2EDelay)}>
                             latency: {remote.audioE2EDelay}ms
