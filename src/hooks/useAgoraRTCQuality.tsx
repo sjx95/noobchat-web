@@ -32,7 +32,11 @@ export default function useAgroaRTCQuality(client: IAgoraRTCClient | undefined) 
             setQuality(new Map(slice));
         };
 
-        setInterval(update, 1000);
+        const h = setInterval(update, 1000);
+        return () => {
+            clearInterval(h);
+            setQuality(new Map());
+        }
     }, [client, setQuality])
 
     return quality;
