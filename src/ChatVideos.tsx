@@ -11,7 +11,7 @@ export interface ChatVideosProps {
     localVideoTrack?: ILocalVideoTrack
     remoteUsers?: IAgoraRTCRemoteUser[]
     videoClient?: IAgoraRTCClient
-    remoteUserInfo?: Map<number, IPublicUserInfo>
+    remoteUserInfo?: Map<string, IPublicUserInfo>
 }
 
 export function ChatVideos(props: ChatVideosProps) {
@@ -26,7 +26,7 @@ export function ChatVideos(props: ChatVideosProps) {
         return {
             rtcUser,
             e2eDelay,
-            userInfo: props.remoteUserInfo?.get(rtcUser.uid as number),
+            userInfo: props.remoteUserInfo?.get(rtcUser.uid.toString()),
         };
     });
 

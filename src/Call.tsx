@@ -29,7 +29,7 @@ export default function Call() {
     localAudioTrack: useWrappedState<IMicrophoneAudioTrack | undefined>(undefined),
   };
 
-  const remoteUserInfo = useURP(userID, gs.msgChannel.value);
+  const remoteUserInfo = useURP(gs.msgChannel.value);
 
   return (
     <Container fluid>
