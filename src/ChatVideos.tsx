@@ -74,7 +74,7 @@ export function ChatVideos(props: ChatVideosProps) {
                 <p className='local-player-text'>
                     {selfInfo ? <img src={selfInfo.avatar_url} alt='' width="32" /> : undefined}
                     <span>
-                        {selfInfo?.name ?? 'remoteTrack'}
+                        {selfInfo?.name ?? selfInfo?.login ?? 'localTrack'}
                         ({props.userID})
                     </span>
                     {localBadge}
@@ -88,7 +88,7 @@ export function ChatVideos(props: ChatVideosProps) {
                     <p className='remote-player-text'>
                         {remote.userInfo ? <img src={remote.userInfo.avatar_url} alt='' width="32" /> : undefined}
                         <span>
-                            {remote.userInfo?.name ?? 'remoteTrack'}
+                            {remote.userInfo?.name ?? remote.userInfo?.login ?? 'remoteTrack'}
                             ({remote.rtcUser.uid})
                         </span>
                         <Badge bg={latencyColor(remote.e2eDelay)}>
