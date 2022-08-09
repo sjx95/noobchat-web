@@ -47,7 +47,7 @@ export default function Call() {
           />
         </Col>
         <Col lg={3} xl={2}>
-          <ChatTexts msgChannel={gs.msgChannel.value} />
+          <ChatTexts userID={userID} msgChannel={gs.msgChannel.value} />
         </Col>
       </Row>
 
