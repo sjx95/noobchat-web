@@ -5,6 +5,7 @@ import { useWrappedState } from './hooks/useWrappedStates';
 import { ChatController, userID } from './ChatController';
 import { ChatVideos } from './ChatVideos';
 import { ChatTexts } from './ChatTexts';
+import { useURP } from './hooks/useURP';
 
 export default function Call() {
 
@@ -28,6 +29,8 @@ export default function Call() {
     localAudioTrack: useWrappedState<IMicrophoneAudioTrack | undefined>(undefined),
   };
 
+  const remoteUserInfo = useURP(gs.msgChannel.value);
+
   return (
     <Container fluid>
       <Row>
@@ -40,10 +43,11 @@ export default function Call() {
             remoteUsers={gs.rtcRemoteUsers.value}
             localVideoTrack={gs.localVideoTrack.value}
             localAudioTrack={gs.localAudioTrack.value}
+            remoteUserInfo={remoteUserInfo}
           />
         </Col>
         <Col lg={3} xl={2}>
-          <ChatTexts msgChannel={gs.msgChannel.value} />
+          <ChatTexts userID={userID} msgChannel={gs.msgChannel.value} />
         </Col>
       </Row>
 

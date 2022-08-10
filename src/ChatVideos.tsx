@@ -3,6 +3,7 @@ import { ReactElement, useEffect, useState } from "react"
 import { Badge } from "react-bootstrap"
 import MediaPlayer from "./components/MediaPlayer"
 import useAgroaRTCQuality from "./hooks/useAgoraRTCQuality"
+import { IPublicUserInfo, useAzureAuth } from "./hooks/useAzureAuth"
 
 export interface ChatVideosProps {
     userID?: number
@@ -10,19 +11,22 @@ export interface ChatVideosProps {
     localVideoTrack?: ILocalVideoTrack
     remoteUsers?: IAgoraRTCRemoteUser[]
     videoClient?: IAgoraRTCClient
+    remoteUserInfo?: Map<string, IPublicUserInfo>
 }
 
 export function ChatVideos(props: ChatVideosProps) {
 
+    const selfInfo = useAzureAuth().publicUserInfo;
+
     const remoteQualities = useAgroaRTCQuality(props.videoClient);
 
-    const remotes = props.remoteUsers?.map((user) => {
-        const rq = remoteQualities.get(user.uid);
-        const e2eDelay = Math.max(rq?.AudioStats?.end2EndDelay ?? 0, rq?.AudioStats?.end2EndDelay ?? 0);
-        const netDelay = Math.max(rq?.AudioStats?.transportDelay ?? 0, rq?.AudioStats?.transportDelay ?? 0);
+    const remotes = props.remoteUsers?.map((rtcUser) => {
+        const rq = remoteQualities.get(rtcUser.uid);
+        const e2eDelay = rq?.AudioStats?.end2EndDelay ?? rq?.VideoStats?.end2EndDelay;
         return {
-            user, e2eDelay, netDelay,
-            audioE2EDelay: rq?.AudioStats?.end2EndDelay
+            rtcUser,
+            e2eDelay,
+            userInfo: props.remoteUserInfo?.get(rtcUser.uid.toString()),
         };
     });
 
@@ -68,7 +72,11 @@ export function ChatVideos(props: ChatVideosProps) {
         <div>
             <div className='local-player-wrapper'>
                 <p className='local-player-text'>
-                    <span>localTrack({props.userID})</span>
+                    {selfInfo ? <img src={selfInfo.avatar_url} alt='' width="32" /> : undefined}
+                    <span>
+                        {selfInfo?.name ?? selfInfo?.login ?? 'localTrack'}
+                        ({props.userID})
+                    </span>
                     {localBadge}
                 </p>
                 <MediaPlayer
@@ -76,16 +84,18 @@ export function ChatVideos(props: ChatVideosProps) {
                     gainRange={[-40, 20]} disableAudio={true} />
             </div>
             {remotes?.map(remote => (
-                <div className='remote-player-wrapper' key={remote.user.uid}>
+                <div className='remote-player-wrapper' key={remote.rtcUser.uid}>
                     <p className='remote-player-text'>
+                        {remote.userInfo ? <img src={remote.userInfo.avatar_url} alt='' width="32" /> : undefined}
                         <span>
-                            {`remoteVideo(${remote.user.uid})`}
+                            {remote.userInfo?.name ?? remote.userInfo?.login ?? 'remoteTrack'}
+                            ({remote.rtcUser.uid})
                         </span>
-                        <Badge bg={latencyColor(remote.audioE2EDelay)}>
-                            latency: {remote.audioE2EDelay}ms
+                        <Badge bg={latencyColor(remote.e2eDelay)}>
+                            latency: {remote.e2eDelay}ms
                         </Badge>
                     </p>
-                    <MediaPlayer videoTrack={remote.user.videoTrack} audioTrack={remote.user.audioTrack} />
+                    <MediaPlayer videoTrack={remote.rtcUser.videoTrack} audioTrack={remote.rtcUser.audioTrack} />
                 </div>
             ))}
         </div>
